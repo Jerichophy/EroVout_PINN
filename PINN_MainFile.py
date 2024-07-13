@@ -35,12 +35,12 @@ class FCN(nn.Module):
 torch.manual_seed(123)
 
 # DATASET
-accX = torch.from_numpy(pd.read_csv(r'C:\Users\Fushio\Desktop\Untitled Folder\EroVout_PINN\Train_DataAcc.csv')['AccX'].to_numpy())
-accY = torch.from_numpy(pd.read_csv(r'C:\Users\Fushio\Desktop\Untitled Folder\EroVout_PINN\Train_DataAcc.csv')['AccY'].to_numpy())
-accZ = torch.from_numpy(pd.read_csv(r'C:\Users\Fushio\Desktop\Untitled Folder\EroVout_PINN\Train_DataAcc.csv')['AccZ'].to_numpy())
-gyroX = torch.from_numpy(pd.read_csv(r'C:\Users\Fushio\Desktop\Untitled Folder\EroVout_PINN\Train_DataGyro.csv')['GyroX'].to_numpy())
-gyroY = torch.from_numpy(pd.read_csv(r'C:\Users\Fushio\Desktop\Untitled Folder\EroVout_PINN\Train_DataGyro.csv')['GyroY'].to_numpy())
-gyroZ = torch.from_numpy(pd.read_csv(r'C:\Users\Fushio\Desktop\Untitled Folder\EroVout_PINN\Train_DataGyro.csv')['GyroZ'].to_numpy())
+accX = torch.from_numpy(pd.read_csv('Train_DataAcc.csv')['AccX'].to_numpy())
+accY = torch.from_numpy(pd.read_csv('Train_DataAcc.csv')['AccY'].to_numpy())
+accZ = torch.from_numpy(pd.read_csv('Train_DataAcc.csv')['AccZ'].to_numpy())
+gyroX = torch.from_numpy(pd.read_csv('Train_DataGyro.csv')['GyroX'].to_numpy())
+gyroY = torch.from_numpy(pd.read_csv('Train_DataGyro.csv')['GyroY'].to_numpy())
+gyroZ = torch.from_numpy(pd.read_csv('Train_DataGyro.csv')['GyroZ'].to_numpy())
 dt = torch.tensor([0.02])
 
 # Define the neural network
