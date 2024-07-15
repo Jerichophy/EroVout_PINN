@@ -1,6 +1,12 @@
 import pandas as pd
+import numpy as np
 import torch
+from sklearn.preprocessing import MinMaxScaler
 
-Time = torch.from_numpy(pd.read_csv(r'C:\Users\Fushio\Desktop\Untitled Folder\EroVout_PINN\Train_DataAcc.csv')['Time'].to_numpy())
-dt = Time[1:] - Time[:-1]
-print (dt)
+# Load data
+acc_data = pd.read_csv('Train_DataAcc.csv')
+gyro_data = pd.read_csv('Train_DataGyro.csv')
+
+# Combine data
+data = pd.concat([acc_data, gyro_data], axis=1)
+print(data)
