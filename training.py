@@ -49,7 +49,7 @@ class EnhancedPinn(nn.Module):
         
         # Feature extraction layers
         self.feature_extractor = nn.Sequential(
-            nn.Linear(input_size, 256),  # Increased capacity
+            nn.Linear(input_size, 256), 
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU()
@@ -60,7 +60,7 @@ class EnhancedPinn(nn.Module):
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, 1),
-            nn.Sigmoid()  # Sigmoid for binary classification (Accident or No Accident)
+            nn.Sigmoid()  
         )
     
     def forward(self, x):

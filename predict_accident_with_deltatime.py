@@ -68,7 +68,7 @@ def main():
     # Make predictions
     with torch.no_grad():
         outputs = model(inputs)
-        predictions = outputs.squeeze().numpy()  # Squeeze to remove unnecessary dimensions
+        predictions = outputs.squeeze().numpy() 
     
     # Convert predictions to labels (Accident or Safe)
     labels = convert_to_label(predictions)
