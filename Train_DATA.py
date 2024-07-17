@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import random
 
 # Gyro
 GyroFile_Path = 'archive/First route/First lap/BS_Route1_gyroscope_1.csv'
@@ -11,8 +10,8 @@ AccFile_Path = 'archive/First route/First lap/BS_Route1_accelerometer_1.csv'
 def load_data(GyroFile_Path, AccFile_Path):
     # Load Gyroscope data
     dfGyro = pd.read_csv(GyroFile_Path, header=None, sep=';', nrows=24793)
-    new_dfGyro = dfGyro.iloc[:, 2:5]
-    new_dfGyro.columns = ['GyroX', 'GyroY', 'GyroZ']
+    new_dfGyro = dfGyro.iloc[:, [0,2,3,4]]
+    new_dfGyro.columns = ['Timestamp','GyroX', 'GyroY', 'GyroZ']
     new_file_pathGyro = 'Train_DataGyro.csv'
     new_dfGyro.to_csv(new_file_pathGyro, index=False)
 

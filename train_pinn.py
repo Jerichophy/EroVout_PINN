@@ -31,8 +31,17 @@ for i in range(1, len(gyro_data)):
 
 data['Yaw'] = yaw
 
-input_features = data[['AccX', 'AccY', 'AccZ', 'GyroX', 'GyroY', 'GyroZ', 'Pitch', 'Roll', 'Yaw']].values
-labels = data['Accident'].values.reshape(-1, 1)  # Assuming 'Accident' is the target column
+# Calculate Velocity from Acceleration
+velocity = np.zeros((len(acc_data), 3))  # Initialize velocity array for [VelX, VelY, VelZ]
+for i in range(1, len(acc_data)):
+    velocity[i] = velocity[i-1] + acc_data[['AccX', 'AccY', 'AccZ']].iloc[i] * delta_time  # Velocity += Acceleration*DeltaTime
+
+data['VelX'] = velocity[:, 0]
+data['VelY'] = velocity[:, 1]
+data['VelZ'] = velocity[:, 2]
+
+input_features = data[['AccX', 'AccY', 'AccZ', 'GyroX', 'GyroY', 'GyroZ', 'Pitch', 'Roll', 'Yaw', 'VelX', 'VelY', 'VelZ']].values
+labels = data['Accident'].values.reshape(-1, 1) 
 
 # Convert to PyTorch tensors
 inputs = torch.tensor(input_features, dtype=torch.float32)
@@ -56,23 +65,12 @@ class PINN(nn.Module):
             nn.Linear(64, 32),
             nn.ReLU(),
             nn.Linear(32, 1),
-            nn.Sigmoid()  # Sigmoid for binary classification (Accident or No Accident)
+            nn.Sigmoid() 
         )
     
     def forward(self, x):
-        # Check input size
-        assert x.shape[1] == self.input_size, f"Expected input size {self.input_size}, but got {x.shape[1]}"
-        
         x = self.feature_extractor(x)
-        
-        # Check intermediate feature size
-        assert x.shape[1] == 64, f"Expected intermediate feature size 64, but got {x.shape[1]}"
-        
         x = self.predictor(x)
-        
-        # Check output size
-        assert x.shape[1] == 1, f"Expected output size 1, but got {x.shape[1]}"
-        
         return x
 
 # Initialize PINN model
@@ -89,15 +87,20 @@ BatchSize = 64
 dataset = TensorDataset(inputs, targets)
 train_loader = DataLoader(dataset, batch_size=BatchSize, shuffle=True)
 
-# Define the physical loss function based on Newton's second law
+# Define the physical loss functions
 def physics_loss(acc, predicted_force, mass=1.0):
     # Newton's second law: F = ma
     force = mass * acc
     return torch.mean((force - predicted_force)**2)
 
+def dynamic_loss(vel, acc, delta_time):
+    # First-order dynamic model: Vel += Acc * DeltaTime
+    predicted_vel = vel[:, :-1] + acc[:, 1:] * delta_time
+    return torch.mean((predicted_vel - vel[:, 1:])**2)
+
 # Training Loop with physics-informed loss
 num_epochs = 10
-mass = 1.0  # Assuming unit mass for simplicity
+mass = 1.0  
 
 for epoch in range(num_epochs):
     for inputs_batch, targets_batch in train_loader:
@@ -108,11 +111,17 @@ for epoch in range(num_epochs):
         
         # Incorporate physics-informed loss
         acc = inputs_batch[:, :3]  # AccX, AccY, AccZ
-        predicted_force = outputs 
-        phy_loss = physics_loss(acc, predicted_force, mass)
+        vel = inputs_batch[:, -3:]  # VelX, VelY, VelZ
+        
+        # Convert predicted force to acceleration to match dimensions
+        predicted_acc = outputs * mass 
+        phy_loss = physics_loss(acc, predicted_acc, mass)
+        
+        # Calculate dynamic loss
+        dyn_loss = dynamic_loss(vel, acc, delta_time)
         
         # Total loss
-        total_loss = loss + phy_loss
+        total_loss = loss + phy_loss + dyn_loss
         
         optimizer.zero_grad()
         total_loss.backward()
