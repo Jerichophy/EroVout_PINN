@@ -1,83 +1,94 @@
+import torch
+import torch.nn as nn
 import pandas as pd
 import numpy as np
-import torch
-from torch import nn
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 
-# Function to generate test data
-def generate_test_data(num_samples=500, delta_time=0.02):
-    np.random.seed(42)
-    test_data = {
-        'Timestamp': np.arange(0, num_samples * delta_time, delta_time),
-        'AccX': np.random.rand(num_samples),
-        'AccY': np.random.rand(num_samples),
-        'AccZ': np.random.rand(num_samples),
-        'GyroX': np.random.rand(num_samples),
-        'GyroY': np.random.rand(num_samples),
-        'GyroZ': np.random.rand(num_samples),
-        'Pitch': np.random.rand(num_samples) * 90,
-        'Roll': np.random.rand(num_samples) * 90,
-        'Yaw': np.cumsum(np.random.rand(num_samples) * 10)  # Cumulative Yaw over time
-    }
-    return pd.DataFrame(test_data)
-
-# Load the trained model
-class PINN(nn.Module):
-    def __init__(self, input_size):
-        super(PINN, self).__init__()
-        self.input_size = input_size
+# Define the model class
+class PINNStuff(nn.Module):
+    def __init__(self, input_dim):
+        super(PINNStuff, self).__init__()
+        self.fc1 = nn.Linear(input_dim, 128)
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(128, 128)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc3 = nn.Linear(128, 64)
+        self.fc4 = nn.Linear(64, 64)
+        self.fc5 = nn.Linear(64, 1)
         
-        # Feature extraction layers
-        self.feature_extractor = nn.Sequential(
-            nn.Linear(input_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU()
-        )
-        
-        # Prediction layers
-        self.predictor = nn.Sequential(
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-            nn.Sigmoid()  # Sigmoid for binary classification (Accident or No Accident)
-        )
-    
     def forward(self, x):
-        x = self.feature_extractor(x)
-        x = self.predictor(x)
+        x = torch.relu(self.fc1(x))
+        x = self.dropout1(x)
+        x = torch.relu(self.fc2(x))
+        x = self.dropout2(x)
+        x = torch.relu(self.fc3(x))
+        x = torch.relu(self.fc4(x))
+        x = torch.sigmoid(self.fc5(x))
         return x
 
-# Function to convert predictions to labels
-def convert_to_label(predictions):
-    return ["Accident" if pred >= 0.5 else "Safe" for pred in predictions]
+# Load the trained model
+input_dim = 9  # Number of input features
+model = PINNStuff(input_dim)
+model.load_state_dict(torch.load('trained_model.pth'))
+model.eval()
 
-# Main function for prediction testing
-def main():
-    # Generate test data
-    test_df = generate_test_data(num_samples=500, delta_time=0.02)
-    
-    # Prepare input features for inference
-    test_features = test_df[['AccX', 'AccY', 'AccZ', 'GyroX', 'GyroY', 'GyroZ', 'Pitch', 'Roll', 'Yaw']].values
-    inputs = torch.tensor(test_features, dtype=torch.float32)
-    
-    # Load the trained model and perform inference
-    model = PINN(input_size=inputs.shape[1])
-    model.load_state_dict(torch.load('trained_model.pth'))
-    model.eval()
+# Function to predict accident
+def predict_accident(data):
+    # Features
+    X = data[['AccX', 'AccY', 'AccZ', 'GyroX', 'GyroY', 'GyroZ', 'Pitch', 'Roll', 'Yaw']]
+
+    # Standardize features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Convert to tensor
+    X_tensor = torch.tensor(X_scaled, dtype=torch.float32)
     
     # Make predictions
     with torch.no_grad():
-        outputs = model(inputs)
-        predictions = outputs.squeeze().numpy() 
+        y_pred = model(X_tensor)
+        y_pred_class = (y_pred > 0.5).float()
     
-    # Convert predictions to labels (Accident or Safe)
-    labels = convert_to_label(predictions)
-    
-    # Add labels to the test_df DataFrame
-    test_df['Prediction'] = labels
-    
-    # Print the test_df with Timestamp and Prediction columns
-    print(test_df[['Timestamp', 'Prediction']])
+    return y_pred_class.numpy(), y_pred.numpy()
 
+# Example usage with random data
 if __name__ == "__main__":
-    main()
+    # Generate random data for testing
+    np.random.seed(42)  # For reproducibility
+    random_data = {
+        'AccX': np.random.randn(10),
+        'AccY': np.random.randn(10),
+        'AccZ': np.random.randn(10),
+        'GyroX': np.random.randn(10),
+        'GyroY': np.random.randn(10),
+        'GyroZ': np.random.randn(10),
+        'Pitch': np.random.randn(10),
+        'Roll': np.random.randn(10),
+        'Yaw': np.random.randn(10)
+    }
+    new_data = pd.DataFrame(random_data)
+
+    # Predict accidents
+    predictions_class, predictions_prob = predict_accident(new_data)
+
+    # Print the predictions
+    print("Predictions:")
+    for i, pred in enumerate(predictions_class):
+        if pred == 1:
+            print(f"Sample {i+1}: There will be an accident")
+        else:
+            print(f"Sample {i+1}: No accident in the near future")
+
+    # Plot the predicted values
+    plt.figure(figsize=(12, 6))
+    plt.plot(predictions_prob, label='Predicted Probability', marker='o')
+    plt.axhline(y=0.5, color='r', linestyle='--', label='Threshold (0.5)')
+    for i, prob in enumerate(predictions_prob):
+        plt.text(i, prob, f'{prob[0]:.2f}', ha='center', va='bottom' if prob > 0.5 else 'top', color='blue')
+    plt.xlabel('Sample Index')
+    plt.ylabel('Predicted Probability')
+    plt.title('Predicted Accident Probabilities')
+    plt.legend()
+    plt.grid(True)
+    plt.show()

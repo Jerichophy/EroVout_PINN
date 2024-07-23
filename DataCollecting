@@ -1,0 +1,75 @@
+import numpy as np 
+import pandas as pd
+
+# File paths
+GyroFile_Path = 'archive/First route/First lap/BS_Route1_gyroscope_1.csv'
+AccFile_Path = 'archive/First route/First lap/BS_Route1_accelerometer_1.csv'
+
+# Define thresholds for accident detection
+ACCEL_THRESHOLD = 8  # Example threshold for acceleration magnitude
+GYRO_THRESHOLD = 0.7   # Example threshold for angular velocity magnitude
+
+def calculate_angles(data):
+    pitch = np.arctan2(data['AccY'], np.sqrt(data['AccX']**2 + data['AccZ']**2)) * 180 / np.pi
+    roll = np.arctan2(-data['AccX'], np.sqrt(data['AccY']**2 + data['AccZ']**2)) * 180 / np.pi
+    return pitch, roll
+
+def calculate_yaw(gyro_data, timestamps):
+    yaw = np.zeros(len(gyro_data))
+    for i in range(1, len(gyro_data)):
+        delta_time = timestamps[i] - timestamps[i - 1]
+        yaw[i] = yaw[i - 1] + gyro_data['GyroZ'][i] * delta_time
+    return yaw
+
+def load_and_combine_data(GyroFile_Path, AccFile_Path):
+    # Load Gyroscope data
+    dfGyro = pd.read_csv(GyroFile_Path, header=None, sep=';', nrows=24793)
+    new_dfGyro = dfGyro.iloc[:, 2:5]
+    new_dfGyro.columns = ['GyroX', 'GyroY', 'GyroZ']
+
+    # Generate synthetic timestamps with 20ms difference (modify as needed)
+    num_timestamps = len(new_dfGyro)
+    start_time = 0  # Adjust this for your desired starting time
+    time_diff = 0.02  # 20 milliseconds difference
+
+    timestamps = start_time + np.arange(num_timestamps) * time_diff
+    new_dfGyro['TimeStamps'] = timestamps
+
+    # Load Accelerometer data
+    dfAcc = pd.read_csv(AccFile_Path, header=None, sep=';', nrows=24793)
+    new_dfAcc = dfAcc.iloc[:, [2, 4, 5]]
+    new_dfAcc.columns = ['AccX', 'AccY', 'AccZ']
+
+    # Calculate Pitch and Roll
+    pitch, roll = calculate_angles(new_dfAcc)
+    new_dfAcc['Pitch'] = pitch
+    new_dfAcc['Roll'] = roll
+
+    # Calculate Yaw
+    yaw = calculate_yaw(new_dfGyro, new_dfGyro['TimeStamps'])
+    new_dfGyro['Yaw'] = yaw
+
+    # Compute magnitudes
+    new_dfAcc['AccMagnitude'] = np.sqrt(new_dfAcc['AccX']**2 + new_dfAcc['AccY']**2 + new_dfAcc['AccZ']**2)
+    new_dfGyro['GyroMagnitude'] = np.sqrt(new_dfGyro['GyroX']**2 + new_dfGyro['GyroY']**2 + new_dfGyro['GyroZ']**2)
+
+    # Set accident flag based on thresholds
+    new_dfAcc['Accident'] = (new_dfAcc['AccMagnitude'] > ACCEL_THRESHOLD).astype(int)
+    new_dfGyro['Accident'] = (new_dfGyro['GyroMagnitude'] > GYRO_THRESHOLD).astype(int)
+
+    # Combine the dataframes
+    combined_df = pd.concat([new_dfGyro, new_dfAcc], axis=1)
+
+    # Reorder columns
+    ordered_columns = ['TimeStamps', 'Accident', 'AccX', 'AccY', 'AccZ', 'GyroX', 'GyroY', 'GyroZ', 'Pitch', 'Roll', 'Yaw']
+    combined_df = combined_df[ordered_columns]
+
+    # Save combined data to a single file
+    combined_file_path = 'DataTrain.csv'
+    combined_df.to_csv(combined_file_path, index=False)
+
+    return combined_file_path
+
+combined_file_path = load_and_combine_data(GyroFile_Path, AccFile_Path)
+
+print(f"Combined data file saved to: {combined_file_path}")
